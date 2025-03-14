@@ -1,0 +1,78 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: crud-laravel-app
+    restart: unless-stopped
+    ports:
+      - "8080:9000"
+    working_dir: /var/www
+    volumes:
+      - ./:/var/www
+      - ./docker/php/local.ini:/usr/local/etc/php/conf.d/local.ini
+    networks:
+      - app-network-crud-laravel
+    depends_on:
+      db:
+        condition: service_healthy
+
+  webserver:
+    image: nginx:alpine
+    container_name: crud-laravel-webserver
+    restart: unless-stopped
+    ports:
+      - "8090:80"
+    volumes:
+      - ./:/var/www
+      - ./docker/nginx/conf.d/:/etc/nginx/conf.d/
+    networks:
+      - app-network-crud-laravel
+    depends_on:
+      - app
+
+  db:
+    image: mysql:5.7.22
+    container_name: crud-laravel-db
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_DATABASE: laravel
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_USER: laraveluser
+      MYSQL_PASSWORD: laravelmdp
+      SERVICE_TAGS: dev
+      SERVICE_NAME: mysql
+    volumes:
+      - dbdata:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network-crud-laravel
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: crud-laravel-phpmyadmin
+    environment:
+      PMA_HOST: db
+      PMA_USER: laraveluser
+      PMA_PASSWORD: laravelmdp
+      PMA_PORT: 3306
+    ports:
+      - "8081:80"
+    networks:
+      - app-network-crud-laravel
+    depends_on:
+      - db
+
+networks:
+  app-network-crud-laravel:
+    driver: bridge
+
+volumes:
+  dbdata:
+    driver: local
